@@ -41,7 +41,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             jwtToken = authorizationHeader.substring(7);
 
             try {
-                // Extract username, userId, and role from the token
+                // Extract and validate only access tokens
                 username = jwtUtil.extractUsername(jwtToken);
                 String userId = jwtUtil.extractUserId(jwtToken);
                 Integer role = jwtUtil.extractRole(jwtToken);
@@ -63,7 +63,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
 
-            // Validate the token
+            // Validate the token (using the regular access token validation)
             if (jwtUtil.validateToken(jwtToken, userDetails.getUsername())) {
                 UsernamePasswordAuthenticationToken authenticationToken = 
                         new UsernamePasswordAuthenticationToken(
