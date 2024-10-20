@@ -24,7 +24,10 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/users/register", "/api/users/login", "/api/products/add-product")
+                        .requestMatchers("/api/users/register", "/api/users/login", "/api/products",
+                                "/api/products/add-product", "/api/products/update-product/{id}",
+                                "/api/products/product-details/{id}", "/api/products/delete-product/{id}",
+                                "/api/products/category/{category}")
                         .permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
