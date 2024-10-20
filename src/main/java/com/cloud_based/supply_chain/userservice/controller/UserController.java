@@ -43,12 +43,12 @@ public class UserController {
             User user = userService.loginUser(email, password);
 
             // Extract necessary details for token generation
-            String username = user.getUsername();
+            email = user.getEmail();
             String userId = user.getId(); // Assuming you have a getId() method for userId
             Integer role = user.getRole(); // Assuming you have a getRole() method for the user's role
 
             // Generate JWT token
-            String token = jwtUtil.generateToken(username, userId, role);
+            String token = jwtUtil.generateToken(email, userId, role);
 
             // Log the token in the terminal
             logger.info("Generated JWT Token: {}", token);
