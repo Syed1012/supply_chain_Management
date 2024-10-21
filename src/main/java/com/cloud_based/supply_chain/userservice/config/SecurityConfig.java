@@ -27,7 +27,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/register", "/api/users/login", "/api/products",
                                 "/api/products/add-product", "/api/products/update-product/{id}",
                                 "/api/products/product-details/{id}", "/api/products/delete-product/{id}",
-                                "/api/products/category/{category}")
+                                "/api/products/category/{category}", "/api/orders", "/api/orders/my-orders",
+                                "/api/orders/create-order", "/api/orders/specific-orderId/{orderId}",
+                                "/api/orders/delete-order/{orderId}")
                         .permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
