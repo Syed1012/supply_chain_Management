@@ -17,13 +17,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.cloud_based.supply_chain.orderservice.dto.OrderRequest;
 import com.cloud_based.supply_chain.orderservice.dto.OrderUpdateRequest;
+import com.cloud_based.supply_chain.orderservice.exception.InsufficientInventoryException;
+import com.cloud_based.supply_chain.orderservice.exception.InvalidOrderStatusException;
 import com.cloud_based.supply_chain.orderservice.model.Order;
 import com.cloud_based.supply_chain.orderservice.service.OrderService;
 
 @RestController
 @RequestMapping("/api/orders")
 public class OrderController {
- 
+
     @Autowired
     private OrderService orderService;
 
@@ -65,7 +67,8 @@ public class OrderController {
 
     // Update an existing order
     @PutMapping("/update/{orderId}")
-    public ResponseEntity<Order> updateOrder(@PathVariable String orderId, @RequestBody OrderUpdateRequest orderUpdateRequest) {
+    public ResponseEntity<Order> updateOrder(@PathVariable String orderId,
+            @RequestBody OrderUpdateRequest orderUpdateRequest) {
         Order updatedOrder = orderService.updateOrder(orderId, orderUpdateRequest);
         if (updatedOrder == null) {
             return ResponseEntity.notFound().build();
@@ -76,10 +79,13 @@ public class OrderController {
     // Update order status (and reduce quantities if necessary)
     @PutMapping("/update-status/{orderId}")
     public ResponseEntity<Order> updateOrderStatus(@PathVariable String orderId, @RequestParam String status) {
-        Order updatedOrder = orderService.updateOrderStatus(orderId, status);
-        if (updatedOrder == null) {
+        try {
+            Order updatedOrder = orderService.updateOrderStatus(orderId, status.toUpperCase());
+            return ResponseEntity.ok(updatedOrder);
+        } catch (InvalidOrderStatusException | InsufficientInventoryException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(updatedOrder);
     }
 }

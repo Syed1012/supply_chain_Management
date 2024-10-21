@@ -8,8 +8,9 @@ import com.cloud_based.supply_chain.InventoryService.model.Product;
 import com.cloud_based.supply_chain.orderservice.Repository.OrderRepository;
 import com.cloud_based.supply_chain.orderservice.dto.OrderUpdateRequest;
 import com.cloud_based.supply_chain.orderservice.model.Order;
+import com.cloud_based.supply_chain.orderservice.exception.InvalidOrderStatusException;
+import com.cloud_based.supply_chain.orderservice.exception.InsufficientInventoryException;
 
-// import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -21,116 +22,165 @@ public class OrderService {
     @Autowired
     private OrderRepository orderRepository;
 
-    // Assuming InventoryService URL
     private final String INVENTORY_SERVICE_URL = "http://localhost:8081/api/products";
 
     @Autowired
-    private RestTemplate restTemplate; // Use RestTemplate to interact with InventoryService
+    private RestTemplate restTemplate;
 
-    // Validate product IDs
-    private boolean areProductIdsValid(List<String> productIds) {
-        for (String productId : productIds) {
-            String url = INVENTORY_SERVICE_URL + productId;
+    public enum OrderStatus {
+        PENDING,
+        CONFIRMED,
+        CANCELLED
+    }
+
+    // Validate product IDs and their quantities
+    private Map<String, Integer> validateProducts(List<String> productIds) {
+        // Count occurrences of each product ID
+        Map<String, Long> productCountMap = productIds.stream()
+                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+        
+        // Validate each product and its quantity
+        for (Map.Entry<String, Long> entry : productCountMap.entrySet()) {
+            String productId = entry.getKey();
+            Long requiredQuantity = entry.getValue();
+            
+            String url = INVENTORY_SERVICE_URL + "/product-details/" + productId;
             Product product = restTemplate.getForObject(url, Product.class);
-            if (product == null || product.getQuantity() <= 0) {
-                return false; // Product doesn't exist or has no quantity
+            
+            if (product == null) {
+                throw new IllegalArgumentException("Product not found: " + productId);
+            }
+            
+            if (product.getQuantity() < requiredQuantity) {
+                throw new InsufficientInventoryException(
+                    String.format("Insufficient quantity for product %s. Required: %d, Available: %d",
+                        productId, requiredQuantity, product.getQuantity())
+                );
             }
         }
-        return true;
+        
+        return productCountMap.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().intValue()));
     }
 
     // Create a new order
     public Order createOrder(String userId, List<String> productIds, double totalPrice) {
-        // Validate product IDs and quantities
-        if (!areProductIdsValid(productIds)) {
-            throw new IllegalArgumentException("Invalid product IDs or insufficient quantities.");
+        // Validate products and their quantities
+        validateProducts(productIds);
+        
+        // Create order with initial PENDING status
+        Order order = new Order(userId, productIds, OrderStatus.PENDING.name(), 
+                              totalPrice, java.time.LocalDate.now().toString());
+        return orderRepository.save(order);
+    }
+
+    // Update order status
+    public Order updateOrderStatus(String orderId, String newStatus) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+
+        OrderStatus currentStatus = OrderStatus.valueOf(order.getOrderStatus());
+        OrderStatus targetStatus = OrderStatus.valueOf(newStatus);
+
+        // Validate status transition
+        if (!isValidStatusTransition(currentStatus, targetStatus)) {
+            throw new InvalidOrderStatusException(
+                String.format("Invalid status transition from %s to %s", currentStatus, targetStatus)
+            );
         }
-        Order order = new Order(userId, productIds, "Pending", totalPrice, java.time.LocalDate.now().toString());
-        return orderRepository.save(order); // Save order in MongoDB
+
+        // Handle quantity updates based on status change
+        if (targetStatus == OrderStatus.CONFIRMED) {
+            // Revalidate quantities and reduce them
+            Map<String, Integer> productQuantities = validateProducts(order.getProductIds());
+            reduceProductQuantities(productQuantities);
+        } else if (targetStatus == OrderStatus.CANCELLED && currentStatus == OrderStatus.CONFIRMED) {
+            // Restore quantities only if cancelling a confirmed order
+            Map<String, Integer> productQuantities = order.getProductIds().stream()
+                    .collect(Collectors.groupingBy(Function.identity(), Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
+            restoreProductQuantities(productQuantities);
+        }
+
+        order.setOrderStatus(targetStatus.name());
+        return orderRepository.save(order);
     }
 
-    // Get all orders for a specific user
-    public List<Order> getOrdersByUserId(String userId) {
-        return orderRepository.findByUserId(userId);
-    }
-
-    // Fetch a specific order by its ID
-    public Order getOrderById(String orderId) {
-        return orderRepository.findById(orderId).orElse(null);
+    private boolean isValidStatusTransition(OrderStatus current, OrderStatus target) {
+        if (current == OrderStatus.PENDING) {
+            return target == OrderStatus.CONFIRMED || target == OrderStatus.CANCELLED;
+        }
+        return false; // No other transitions allowed
     }
 
     // Delete an order
     public boolean deleteOrderById(String orderId) {
-        Order order = orderRepository.findById(orderId).orElse(null);
-        if (order != null) {
-            restoreProductQuantities(order.getProductIds()); // Restore quantities before deleting
-            orderRepository.deleteById(orderId);
-            return true;
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+
+        // Only restore quantities if the order was CONFIRMED
+        if (OrderStatus.valueOf(order.getOrderStatus()) == OrderStatus.CONFIRMED) {
+            Map<String, Integer> productQuantities = order.getProductIds().stream()
+                    .collect(Collectors.groupingBy(Function.identity(), Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
+            restoreProductQuantities(productQuantities);
         }
-        return false;
+
+        orderRepository.deleteById(orderId);
+        return true;
     }
 
-    // Restore product quantities when the order is deleted
-    private void restoreProductQuantities(List<String> productIds) {
-        for (String productId : productIds) {
-            String url = INVENTORY_SERVICE_URL + productId;
+    private void reduceProductQuantities(Map<String, Integer> productQuantities) {
+        for (Map.Entry<String, Integer> entry : productQuantities.entrySet()) {
+            String productId = entry.getKey();
+            int quantityToReduce = entry.getValue();
+
+            String url = INVENTORY_SERVICE_URL + "/product-details/" + productId;
             Product product = restTemplate.getForObject(url, Product.class);
 
             if (product != null) {
-                product.setQuantity(product.getQuantity() + 1); // Increase quantity by 1
-                restTemplate.put(INVENTORY_SERVICE_URL + productId, product);
+                product.setQuantity(product.getQuantity() - quantityToReduce);
+                restTemplate.put(INVENTORY_SERVICE_URL + "/update-product/" + productId, product);
             }
         }
     }
 
-    // Update an existing order (not just status, but the entire order)
-    public Order updateOrder(String orderId, OrderUpdateRequest orderUpdateRequest) {
-        Order order = orderRepository.findById(orderId).orElse(null);
-        if (order != null) {
-            order.setProductIds(orderUpdateRequest.getProductIds());
-            order.setTotalPrice(orderUpdateRequest.getTotalPrice());
-            order.setOrderStatus(orderUpdateRequest.getOrderStatus());
-            return orderRepository.save(order); // Save updated order
-        }
-        return null;
-    }
-
-    // Update order status (and reduce product quantity if the status is
-    // "Completed")
-    public Order updateOrderStatus(String orderId, String status) {
-        Order order = orderRepository.findById(orderId).orElse(null);
-        if (order != null) {
-            order.setOrderStatus(status);
-            if (status.equals("Completed")) {
-                reduceProductQuantities(order.getProductIds()); // Call to InventoryService
-            }
-            return orderRepository.save(order);
-        }
-        return null;
-    }
-
-    // Reduce product quantities when the order is completed
-    private void reduceProductQuantities(List<String> productIds) {
-        // Count occurrences of each product ID
-        Map<String, Long> productCountMap = productIds.stream()
-                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
-
-        for (Map.Entry<String, Long> entry : productCountMap.entrySet()) {
+    private void restoreProductQuantities(Map<String, Integer> productQuantities) {
+        for (Map.Entry<String, Integer> entry : productQuantities.entrySet()) {
             String productId = entry.getKey();
-            long quantityToReduce = entry.getValue();
+            int quantityToRestore = entry.getValue();
 
-            // Fetch product from InventoryService
-            String url = INVENTORY_SERVICE_URL + productId;
+            String url = INVENTORY_SERVICE_URL + "/product-details/" + productId;
             Product product = restTemplate.getForObject(url, Product.class);
 
-            if (product != null && product.getQuantity() >= quantityToReduce) {
-                product.setQuantity(product.getQuantity() - (int) quantityToReduce); // Cast to int, Decrease by the ordered quantity
-
-                // Update the product back in InventoryService
-                restTemplate.put(INVENTORY_SERVICE_URL + productId, product);
-            } else {
-                throw new IllegalArgumentException("Not enough quantity for product ID: " + productId);
+            if (product != null) {
+                product.setQuantity(product.getQuantity() + quantityToRestore);
+                restTemplate.put(INVENTORY_SERVICE_URL + "/update-product/" + productId, product);
             }
         }
+    }
+
+    // Other existing methods...
+    public List<Order> getOrdersByUserId(String userId) {
+        return orderRepository.findByUserId(userId);
+    }
+
+    public Order getOrderById(String orderId) {
+        return orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+    }
+
+    public Order updateOrder(String orderId, OrderUpdateRequest orderUpdateRequest) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        
+        // Only allow updates if order is in PENDING status
+        if (OrderStatus.valueOf(order.getOrderStatus()) != OrderStatus.PENDING) {
+            throw new InvalidOrderStatusException("Can only update orders in PENDING status");
+        }
+
+        validateProducts(orderUpdateRequest.getProductIds());
+        
+        order.setProductIds(orderUpdateRequest.getProductIds());
+        order.setTotalPrice(orderUpdateRequest.getTotalPrice());
+        return orderRepository.save(order);
     }
 }

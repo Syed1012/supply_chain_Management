@@ -29,7 +29,8 @@ public class SecurityConfig {
                                 "/api/products/product-details/{id}", "/api/products/delete-product/{id}",
                                 "/api/products/category/{category}", "/api/orders", "/api/orders/my-orders",
                                 "/api/orders/create-order", "/api/orders/specific-orderId/{orderId}",
-                                "/api/orders/delete-order/{orderId}")
+                                "/api/orders/delete-order/{orderId}", "api/orders/update/{orderId}",
+                                "api/orders/update-status/{orderId}")
                         .permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
