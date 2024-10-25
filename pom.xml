@@ -78,6 +78,15 @@
 			<optional>true</optional>
 		</dependency>
 
+		<!-- Dot env loading tool -->
+		<dependency>
+			<groupId>io.github.cdimascio</groupId>
+			<artifactId>java-dotenv</artifactId>
+			<version>5.2.2</version>
+		</dependency>
+
+
+
 		<!-- Lombok -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
