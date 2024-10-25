@@ -29,7 +29,6 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthenticationRequest authRequest) {
         try {
-            // Authenticate the user
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(authRequest.getEmail(), authRequest.getPassword())
             );
@@ -37,7 +36,6 @@ public class AuthController {
             return ResponseEntity.status(401).body("Incorrect email or password");
         }
 
-        // Fetch user details from repository
         Optional<User> optionalUser = userRepository.findByEmail(authRequest.getEmail());
 
         if (!optionalUser.isPresent()) {
@@ -46,9 +44,9 @@ public class AuthController {
 
         User user = optionalUser.get();
 
-        // Generate both Access and Refresh tokens
+        // Ensure we're passing the email here, not the username
         final String accessToken = jwtUtil.generateToken(user.getEmail(), user.getId(), user.getRole());
-        final String refreshToken = jwtUtil.generateToken(user.getEmail(), user.getId(), user.getRole());
+        final String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
 
         return ResponseEntity.ok(new AuthenticationResponse(accessToken, refreshToken));
     }
@@ -56,13 +54,13 @@ public class AuthController {
     // Refresh Access Token
     @PostMapping("/refresh-token")
     public ResponseEntity<?> refreshAccessToken(@RequestParam String refreshToken) {
-        // Extract the username from the refresh token
-        String username = jwtUtil.extractUsername(refreshToken);
-
-        // Validate refresh token
-        if (jwtUtil.validateRefreshToken(refreshToken, username)) {
-            // Fetch the user details from the database
-            Optional<User> optionalUser = userRepository.findByEmail(username);
+        // Extract email from refresh token
+        String email = jwtUtil.extractRefreshTokenEmail(refreshToken);
+ 
+        // Validate the refresh token using the email
+        if (jwtUtil.validateRefreshToken(refreshToken, email)) {
+            // Fetch the user details from the database using email
+            Optional<User> optionalUser = userRepository.findByEmail(email);
 
             if (!optionalUser.isPresent()) {
                 return ResponseEntity.status(404).body("User not found");
@@ -70,7 +68,7 @@ public class AuthController {
 
             User user = optionalUser.get();
 
-            // Generate a new Access Token
+            // Generate a new Access Token using the user's email
             final String newAccessToken = jwtUtil.generateToken(user.getEmail(), user.getId(), user.getRole());
 
             return ResponseEntity.ok(new AuthenticationResponse(newAccessToken, refreshToken));

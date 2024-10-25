@@ -1,6 +1,7 @@
 package com.cloud_based.supply_chain.userservice.config;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import org.springframework.stereotype.Component;
@@ -16,34 +17,40 @@ public class JwtUtil {
     private String SECRET_KEY = "your_secret_key"; // Replace with a strong secret key
     private String REFRESH_SECRET_KEY = "your_refresh_secret_key"; // Strong refresh key
 
-    // Generate Access Token with username, userId, and role
-    public String generateToken(String username, String userId, Integer role) {
+    // Generate Access Token with email, userId, and role
+    public String generateToken(String email, String userId, Integer role) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("role", role);
-        return createToken(claims, username, SECRET_KEY, 1000 * 60 * 60); // 1 hour access token
+        claims.put("sub", email);
+        return createToken(claims, email, SECRET_KEY, 1000 * 60 * 60); // 1 hour access token
     }
 
-    // Generate Refresh Token with username (refresh tokens typically have longer expiry)
-    public String generateRefreshToken(String username) {
-        Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, username, REFRESH_SECRET_KEY, 1000 * 60 * 60 * 24 * 7); // 7 days refresh token
+    // Generate Refresh Token with email
+    public String generateRefreshToken(String email) {
+        return createToken(new HashMap<>(), email, REFRESH_SECRET_KEY, 1000 * 60 * 60 * 24 * 7); // 7 days refresh token
     }
 
     // Create JWT Token using the provided secret
     private String createToken(Map<String, Object> claims, String subject, String secret, long expirationTime) {
         return Jwts.builder()
                 .setClaims(claims)
-                .setSubject(subject)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + expirationTime)) // Expiry time
                 .signWith(SignatureAlgorithm.HS256, secret)
                 .compact();
     }
 
-    // Extract username from the token
-    public String extractUsername(String token) {
-        return extractClaim(token, Claims::getSubject);
+    // Validate access token
+    public Boolean validateToken(String token, String email) {
+        final String extractedEmail = extractEmail(token);
+        return (extractedEmail.equals(email) && !isTokenExpired(token, SECRET_KEY));
+    }
+
+    // Modify extractEmail to get it from claims
+    public String extractEmail(String token) {
+        Claims claims = extractAllClaims(token, SECRET_KEY);
+        return (String) claims.get("sub");
     }
 
     // Extract userId from the token
@@ -64,21 +71,37 @@ public class JwtUtil {
         return claimsResolver.apply(claims);
     }
 
-    // Extract all claims using the provided secret
-    private Claims extractAllClaims(String token, String secret) {
-        return Jwts.parser().setSigningKey(secret).parseClaimsJws(token).getBody();
+    public String extractRefreshTokenEmail(String token) {
+        try {
+            Claims claims = extractAllClaims(token, REFRESH_SECRET_KEY);
+            String email = claims.getSubject();
+            if (email == null || email.trim().isEmpty()) {
+                throw new IllegalArgumentException("Email not found in refresh token");
+            }
+            return email;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid refresh token or email not found");
+        }
     }
 
-    // Validate access token
-    public Boolean validateToken(String token, String username) {
-        final String extractedUsername = extractUsername(token);
-        return (extractedUsername.equals(username) && !isTokenExpired(token, SECRET_KEY));
+    // Extract all claims using the provided secret
+    private Claims extractAllClaims(String token, String secret) {
+        try {
+            return Jwts.parser()
+                    .setSigningKey(secret)
+                    .parseClaimsJws(token)
+                    .getBody();
+        } catch (MalformedJwtException e) {
+            throw new IllegalArgumentException("Invalid or Malformed JWT token");
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Token processing failed: " + e.getMessage());
+        }
     }
 
     // Validate refresh token
-    public Boolean validateRefreshToken(String token, String username) {
-        final String extractedUsername = extractClaim(token, Claims::getSubject);
-        return (extractedUsername.equals(username) && !isTokenExpired(token, REFRESH_SECRET_KEY));
+    public Boolean validateRefreshToken(String token, String email) {
+        final String extractedEmail = extractRefreshTokenEmail(token);
+        return (extractedEmail.equals(email) && !isTokenExpired(token, REFRESH_SECRET_KEY));
     }
 
     // Check if token is expired
@@ -94,10 +117,10 @@ public class JwtUtil {
     // Refresh Access Token using the Refresh Token
     public String refreshAccessToken(String refreshToken) {
         final Claims claims = extractAllClaims(refreshToken, REFRESH_SECRET_KEY);
-        String username = claims.getSubject();
+        String email = claims.getSubject();
         String userId = (String) claims.get("userId");
         Integer role = (Integer) claims.get("role");
 
-        return generateToken(username, userId, role); // Generate new access token
+        return generateToken(email, userId, role); // Generate new access token
     }
 }

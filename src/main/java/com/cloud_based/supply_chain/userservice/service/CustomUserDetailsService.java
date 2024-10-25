@@ -17,8 +17,13 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Autowired
     private UserRepository userRepository;
 
+    // Update method to use email, consistent with your authentication flow
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        return loadUserByEmail(email);
+    }
+
+    public UserDetails loadUserByEmail(String email) throws UsernameNotFoundException {
         // Find user by email
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
