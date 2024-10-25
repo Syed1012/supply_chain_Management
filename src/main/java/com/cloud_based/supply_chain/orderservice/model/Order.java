@@ -15,7 +15,7 @@ public class Order {
 
     private List<String> productIds; // List of product IDs from InventoryService
 
-    private String orderStatus; // For example: "Pending", "Completed", "Cancelled"
+    private String orderStatus; 
 
     private double totalPrice;
 

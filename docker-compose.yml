@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  userservice:
+    build:
+      context: .
+      dockerfile: Dockerfile.userservice
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=userservice
+      - SERVER_PORT=8081
+      - MONGO_URI=mongodb+srv://admin:admin@supplychain.fkxkn.mongodb.net/
+      - MONGO_DB=supply_chain
+    networks:
+      - supply-chain-network
+
+  inventoryservice:
+    build:
+      context: .
+      dockerfile: Dockerfile.inventoryservice
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=inventoryservice
+      - SERVER_PORT=8082
+      - MONGO_URI=mongodb+srv://admin:admin@supplychain.fkxkn.mongodb.net/
+      - MONGO_DB=supply_chain
+    networks:
+      - supply-chain-network
+    depends_on:
+      - userservice
+
+  orderservice:
+    build:
+      context: .
+      dockerfile: Dockerfile.orderservice
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=orderservice
+      - SERVER_PORT=8083
+      - MONGO_URI=mongodb+srv://admin:admin@supplychain.fkxkn.mongodb.net/
+      - MONGO_DB=supply_chain
+    networks:
+      - supply-chain-network
+    depends_on:
+      - inventoryservice
+
+networks:
+  supply-chain-network:
+    driver: bridge

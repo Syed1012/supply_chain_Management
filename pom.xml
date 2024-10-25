@@ -85,8 +85,6 @@
 			<version>5.2.2</version>
 		</dependency>
 
-
-
 		<!-- Lombok -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
