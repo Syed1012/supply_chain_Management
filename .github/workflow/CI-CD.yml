@@ -1,0 +1,88 @@
+# .github/workflows/ci-pipeline.yml
+name: Production CI Pipeline for Supply Chain Microservices
+
+on:
+  push:
+    branches:
+      - production # Trigger only on commits to the production branch
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      mongo:
+        image: mongo:5.0
+        ports:
+          - 27017:27017
+        options: > 
+          --health-cmd "mongo --eval 'db.runCommand({ ping: 1 })'" 
+          --health-interval=10s 
+          --health-timeout=5s 
+          --health-retries=3
+
+    env:
+      MONGO_URI: ${{ secrets.MONGO_URI }}
+      MONGO_DB: ${{ secrets.MONGO_DB }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+
+      - name: Build and Test Userservice
+        run: |
+          cd userservice
+          ./mvnw clean install
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          MONGO_DB: ${{ secrets.MONGO_DB }}
+
+      - name: Build and Test Inventoryservice
+        run: |
+          cd inventoryservice
+          ./mvnw clean install
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          MONGO_DB: ${{ secrets.MONGO_DB }}
+
+      - name: Build and Test Orderservice
+        run: |
+          cd orderservice
+          ./mvnw clean install
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          MONGO_DB: ${{ secrets.MONGO_DB }}
+
+  dockerize-and-push:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push Userservice Docker Image
+        run: |
+          docker build -f Dockerfile.userservice -t ${{ secrets.DOCKER_USERNAME }}/userservice:latest .
+          docker push ${{ secrets.DOCKER_USERNAME }}/userservice:latest
+
+      - name: Build and Push Inventoryservice Docker Image
+        run: |
+          docker build -f Dockerfile.inventoryservice -t ${{ secrets.DOCKER_USERNAME }}/inventoryservice:latest .
+          docker push ${{ secrets.DOCKER_USERNAME }}/inventoryservice:latest
+
+      - name: Build and Push Orderservice Docker Image
+        run: |
+          docker build -f Dockerfile.orderservice -t ${{ secrets.DOCKER_USERNAME }}/orderservice:latest .
+          docker push ${{ secrets.DOCKER_USERNAME }}/orderservice:latest
