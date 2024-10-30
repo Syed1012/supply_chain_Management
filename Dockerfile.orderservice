@@ -11,8 +11,6 @@ RUN ./mvnw clean package -DskipTests
 FROM openjdk:17-slim
 WORKDIR /app
 COPY --from=builder /app/target/supply_chain-0.0.1-SNAPSHOT.jar app.jar
-ENV PORT=8083 \
-    MONGO_URI=mongodb+srv://admin:admin@supplychain.fkxkn.mongodb.net/ \
-    MONGO_DB=supply_chain
+ENV PORT=8083
 EXPOSE ${PORT}
 ENTRYPOINT ["java", "-jar", "app.jar", "--spring.profiles.active=orderservice"]

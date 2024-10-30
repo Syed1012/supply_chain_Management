@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   userservice:
     build:
@@ -10,8 +8,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=userservice
       - SERVER_PORT=8081
-      - MONGO_URI=mongodb+srv://admin:admin@supplychain.fkxkn.mongodb.net/
-      - MONGO_DB=supply_chain
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
     networks:
       - supply-chain-network
 
@@ -24,8 +22,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=inventoryservice
       - SERVER_PORT=8082
-      - MONGO_URI=mongodb+srv://admin:admin@supplychain.fkxkn.mongodb.net/
-      - MONGO_DB=supply_chain
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
     networks:
       - supply-chain-network
     depends_on:
@@ -40,8 +38,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=orderservice
       - SERVER_PORT=8083
-      - MONGO_URI=mongodb+srv://admin:admin@supplychain.fkxkn.mongodb.net/
-      - MONGO_DB=supply_chain
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB=${MONGO_DB}
     networks:
       - supply-chain-network
     depends_on:
