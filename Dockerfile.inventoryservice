@@ -1,0 +1,16 @@
+# Dockerfile.inventoryservice
+FROM openjdk:17-slim AS builder
+WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+COPY .mvn/ .mvn/
+COPY mvnw .
+RUN chmod +x mvnw
+RUN ./mvnw clean package -DskipTests
+
+FROM openjdk:17-slim
+WORKDIR /app
+COPY --from=builder /app/target/supply_chain-0.0.1-SNAPSHOT.jar app.jar
+ENV PORT=8082
+EXPOSE ${PORT}
+ENTRYPOINT ["java", "-jar", "app.jar", "--spring.profiles.active=inventoryservice"]
