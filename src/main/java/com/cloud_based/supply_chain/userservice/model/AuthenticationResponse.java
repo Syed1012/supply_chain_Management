@@ -3,6 +3,7 @@ package com.cloud_based.supply_chain.userservice.model;
 public class AuthenticationResponse {
 
     private final String accessToken;
+    
     private final String refreshToken;
 
     public AuthenticationResponse(String accessToken, String refreshToken) {
