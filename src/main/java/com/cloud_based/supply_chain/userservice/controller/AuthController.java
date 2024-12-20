@@ -38,7 +38,7 @@ public class AuthController {
 
         Optional<User> optionalUser = userRepository.findByEmail(authRequest.getEmail());
 
-        if (!optionalUser.isPresent()) {
+        if (optionalUser.isEmpty()) {
             return ResponseEntity.status(404).body("User not found");
         }
 
@@ -62,7 +62,7 @@ public class AuthController {
             // Fetch the user details from the database using email
             Optional<User> optionalUser = userRepository.findByEmail(email);
 
-            if (!optionalUser.isPresent()) {
+            if (optionalUser.isEmpty()) {
                 return ResponseEntity.status(404).body("User not found");
             }
 

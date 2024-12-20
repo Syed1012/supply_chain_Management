@@ -53,8 +53,8 @@ public class OrderService {
             
             if (product.getQuantity() < requiredQuantity) {
                 throw new InsufficientInventoryException(
-                    String.format("Insufficient quantity for product %s. Required: %d, Available: %d",
-                        productId, requiredQuantity, product.getQuantity())
+                        "Insufficient quantity for product %s. Required: %d, Available: %d".formatted(
+                                productId, requiredQuantity, product.getQuantity())
                 );
             }
         }
@@ -85,7 +85,7 @@ public class OrderService {
         // Validate status transition
         if (!isValidStatusTransition(currentStatus, targetStatus)) {
             throw new InvalidOrderStatusException(
-                String.format("Invalid status transition from %s to %s", currentStatus, targetStatus)
+                    "Invalid status transition from %s to %s".formatted(currentStatus, targetStatus)
             );
         }
 

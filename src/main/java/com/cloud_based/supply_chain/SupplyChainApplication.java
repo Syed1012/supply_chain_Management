@@ -32,7 +32,7 @@ public class SupplyChainApplication {
     }
 
     @Bean
-    public RestTemplate restTemplate() {
+    RestTemplate restTemplate() {
         return new RestTemplate();
     }
 }
