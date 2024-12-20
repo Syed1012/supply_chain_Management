@@ -1,3 +1,5 @@
+//AuthenticationResponse.java
+
 package com.cloud_based.supply_chain.userservice.model;
 
 public class AuthenticationResponse {

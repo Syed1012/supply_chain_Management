@@ -1,3 +1,5 @@
+//CustomUserDetailsService.java
+
 package com.cloud_based.supply_chain.userservice.service;
 
 import com.cloud_based.supply_chain.userservice.model.User;
@@ -31,9 +33,6 @@ public class CustomUserDetailsService implements UserDetailsService {
         // Convert role integer to authorities
         List<GrantedAuthority> authorities = new ArrayList<>();
         switch (user.getRole()) {
-            case 0:
-                authorities.add(new SimpleGrantedAuthority("ROLE_MANAGER"));
-                break;
             case 1:
                 authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
                 break;
