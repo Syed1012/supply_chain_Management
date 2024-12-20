@@ -92,6 +92,12 @@
 			<optional>true</optional>
 		</dependency>
 
+		<!-- spring kafka dependency -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
+
 		 <!-- JAXB API and implementation dependencies -->
 		<dependency>
 			<groupId>jakarta.xml.bind</groupId>
