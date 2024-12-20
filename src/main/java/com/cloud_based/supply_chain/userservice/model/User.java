@@ -12,7 +12,7 @@ public class User {
     private String email;
     private String password;
     private String phonenum;
-    private int role; // 0: Manager, 1: Admin, 2: User, etc.
+    private int role; // 1:Admin, 2:User.
 
     public User() {
         this.role = 2; // Default role is 'User'
